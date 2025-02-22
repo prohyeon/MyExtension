@@ -35,6 +35,7 @@
             text.style.height = 0
             text.classList.add("overflow-hidden")
             move.parentNode.append(text)
+            move.alt = "wall_break_t"
         })
 
         var heatburst = document.querySelectorAll("[alt=heatburst]")
@@ -45,6 +46,7 @@
             text.style.height = 0
             text.classList.add("overflow-hidden")
             move.parentNode.append(text)
+            move.alt = "heatburst_t"
         })
 
        var floor_break = document.querySelectorAll("[alt=floor_break]")
@@ -55,6 +57,7 @@
             text.style.height = 0
             text.classList.add("overflow-hidden")
             move.parentNode.append(text)
+            move.alt = "floor_break_t"
         })
 
         var tornado = document.querySelectorAll("[alt=tornado]")
@@ -65,6 +68,7 @@
             text.style.height = 0
             text.classList.add("overflow-hidden")
             move.parentNode.append(text)
+            move.alt = "tornado_t"
         })
 
         var homing = document.querySelectorAll("[alt=homing]")
@@ -75,6 +79,7 @@
             text.style.height = 0
             text.classList.add("overflow-hidden")
             move.parentNode.append(text)
+            move.alt = "homing_t"
         })
     }
 
