@@ -80,7 +80,6 @@
 
     //script start
     console.log("[SearchMove]: Loading..")
-    while (!document.querySelector("[alt=powercrush]")){}
-    searchmove()
+    setInterval(searchmove,1000)
     console.log("[SearchMove]: Active.")
 })();
