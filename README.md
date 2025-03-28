@@ -5,6 +5,7 @@
 * <a href="#arcagallery">ArcaGallery</a>
 * <a href="#hydron">Hydron</a>
 * <a href="#searchmove">SearchMove</a>
+* <a href="#everycomment">EveryComment</a>
 
 ## FIST 
 유튜브의 불법사이트 광고 댓글을 제거하는 스크립트입니다.\
@@ -30,6 +31,10 @@
 ## SearchMove
 [Tekken8 Movelist](https://tekken8.movelist.xyz) 웹사이트를 보다 편리하게 사용하기 위한 스크립트입니다.\
 기술을 파워크래시, 벽꽝, 바닥꽝 등으로 검색가능하게 됩니다.
+
+## EveryComment
+에브리타임 댓글 기능을 보다 편리하게 사용하기 위한 스크립트입니다.\
+PC에서도 댓글을 여러줄로 작성가능하도록 만듭니다.
 
 ## License
 기본적으로 모든 스크립트는 [DBAD 라이센스](https://github.com/philsturgeon/dbad/blob/master/LICENSE.md)를 따릅니다.
