@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         JangSinGu-SsalMukGi
 // @namespace    http://tampermonkey.net/
-// @version      2025-04-13
+// @version      2025-04-14
 // @description  로스트아크 경매장에서 장신구를 힘민지/골드 그래프로 보여줍니다.
 // @author       Graval504
 // @match        https://lostark.game.onstove.com/Auction
@@ -298,7 +298,7 @@ const SEARCH_DELAY = 0.2;
 async function getSearchResult(input, apikey) {
   var [accType, searchGrade, filter] = input;
   let count = 0;
-  var productsAll = [];
+  var productsAll = [[],[],[],[]]; // 연마횟수 별 정렬
   for (var grindNum = input[2].length; grindNum <= 3; grindNum++) {
     for (const options of getAllOptions(input)) {
       count += 1;
@@ -325,19 +325,19 @@ async function getSearchResult(input, apikey) {
         },
       };
       var products = await trySearch(form, 1);
-      productsAll.push(...products);
+      productsAll[grindNum].push(...products);
       var page = 1;
       var foundProducts = 0;
       while (
         products.length == 10 &&
-        foundProducts * getAllOptions(input).length < ProductNum
+        foundProducts * getAllOptions(input).length * (4-input[2].length) < ProductNum
       ) {
         page += 1;
         await new Promise((resolve) =>
           setTimeout(resolve, SEARCH_DELAY * 1000)
         );
         products = await trySearch(form, page);
-        productsAll.push(...products);
+        productsAll[grindNum].push(...products);
         foundProducts += products.filter((product) => product.price).length;
         console.log(foundProducts, getAllOptions(input).length, ProductNum);
       }
@@ -372,22 +372,24 @@ function createChartAndOpenImage(result, input) {
       document.querySelector("form").prepend(canvas);
     }
 
+    // 데이터셋 준비
+    const datasets = []
+    for (var grindNum = input[2].length; grindNum <= 3; grindNum++) {
+      datasets.push({
+        label: `${grindNum}연마`,
+        data: result[grindNum].map((item) => ({
+          x: item.statPer,
+          y: item.buyPrice,
+        })),
+        pointRadius: 5,
+      })
+    }
     // 3. 차트 생성
     const ctx = document.getElementById("scatter-chart").getContext("2d");
     window.myChart = new Chart(ctx, {
       type: "scatter",
       data: {
-        datasets: [
-          {
-            label: "장신구",
-            data: result.map((item) => ({
-              x: item.statPer,
-              y: item.buyPrice,
-            })),
-            pointBackgroundColor: "blue",
-            pointRadius: 5,
-          },
-        ],
+        datasets: datasets,
       },
       options: {
         responsive: true,
@@ -396,11 +398,12 @@ function createChartAndOpenImage(result, input) {
             callbacks: {
               label: (context) => {
                 const idx = context.dataIndex;
-                return `힘민지: ${result[idx].stat}-${
+                const grindIdx = context.datasetIndex+input[2].length;
+                return `힘민지: ${result[grindIdx][idx].stat}-${
                   Math.round(context.raw.x * 100000) / 1000
-                }%, 골드: ${context.raw.y},\n${result[idx].effects
+                }%, 골드: ${context.raw.y},\n${result[grindIdx][idx].effects
                   .slice(5)
-                  .map((item) => [item["OptionName"] + ": " + item["Value"]])}`;
+                  .map((item) => [item["OptionName"] + ": " + item["Value"] + "%".repeat(item["Value"]%1!=0)])}`;
               },
             },
             bodyFont: { size: 14 },
@@ -451,18 +454,18 @@ function createChartAndOpenImage(result, input) {
           document.querySelector(".content--auction").appendChild(btn);
           if (elements.length > 0) {
             const index = elements[0].index;
-
-            var grindOptions = result[index].effects.slice(5);
+            const grindIdx = elements[0].datasetIndex+input[2].length;
+            var grindOptions = result[grindIdx][index].effects.slice(5);
             const form = {
-              itemName: result[index].name,
+              itemName: result[grindIdx][index].name,
               gradeQuality:
-                result[index].gradeQuality == 100
-                  ? result[index].gradeQuality
-                  : Math.floor(result[index].gradeQuality / 10) * 10,
+                result[grindIdx][index].gradeQuality == 100
+                  ? result[grindIdx][index].gradeQuality
+                  : Math.floor(result[grindIdx][index].gradeQuality / 10) * 10,
               category: category[input[0]],
-              grade: result[index].grade,
-              upgrade: result[index].grindNum,
-              enlightenment: result[index].effects[0]["Value"],
+              grade: result[grindIdx][index].grade,
+              upgrade: result[grindIdx][index].grindNum,
+              enlightenment: result[grindIdx][index].effects[0]["Value"],
               grindOption1: grindOptions[0] && {
                 type: optionFullName[
                   grindOptions[0]["OptionName"] +
@@ -497,7 +500,7 @@ function createChartAndOpenImage(result, input) {
 
             while (!done) {
               var doc = await searchAuction(form, pageCount);
-              const id = findItemEqual(doc, result[index]);
+              const id = findItemEqual(doc, result[grindIdx][index]);
               if (id) {
                 btn.dataset.productid = id;
                 console.log(btn.dataset.productid);
