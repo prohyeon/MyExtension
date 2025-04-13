@@ -6,6 +6,7 @@
 * <a href="#hydron">Hydron</a>
 * <a href="#searchmove">SearchMove</a>
 * <a href="#everycomment">EveryComment</a>
+* <a href="#jangsingu-ssalmukgi">JangSinGu-SsalMukGi</a>
 
 ## FIST 
 유튜브의 불법사이트 광고 댓글을 제거하는 스크립트입니다.\
@@ -35,6 +36,11 @@
 ## EveryComment
 에브리타임 댓글 기능을 보다 편리하게 사용하기 위한 스크립트입니다.\
 PC에서도 댓글을 여러줄로 작성가능하도록 만듭니다.
+
+## JangSinGu-SsalMukGi
+로스트아크 경매장 사이트에서 장신구를 힘민지 / 골드 그래프로 보여주는 스크립트입니다.\
+[로스트아크 개발자 포털](https://developer-lostark.game.onstove.com/)에서 API key를 발급받으셔야 사용이 가능합니다.\
+그래프는 Shift / Alt + 스크롤로 각 축을 확대 또는 축소할 수 있습니다.
 
 ## License
 기본적으로 모든 스크립트는 [DBAD 라이센스](https://github.com/philsturgeon/dbad/blob/master/LICENSE.md)를 따릅니다.
