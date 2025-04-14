@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         JangSinGu-SsalMukGi
 // @namespace    http://tampermonkey.net/
-// @version      2025-04-14
+// @version      2025-04-14-2
 // @description  로스트아크 경매장에서 장신구를 힘민지/골드 그래프로 보여줍니다.
 // @author       Graval504
 // @match        https://lostark.game.onstove.com/Auction
@@ -26,12 +26,12 @@ const option = {
   깡무공: 54,
 };
 const optionFullName = {
+  "추가 피해": 41,
+  "적에게 주는 피해 증가": 42,
+  공격력: 45,
+  "무기 공격력": 46,
   "치명타 적중률": 49,
   "치명타 피해": 50,
-  "적에게 주는 피해 증가": 42,
-  "추가 피해": 41,
-  "무기 공격력": 46,
-  공격력: 45,
   "무기 공격력+": 54,
   "공격력+": 53,
   낙인력: 44,
@@ -45,6 +45,18 @@ const optionFullName = {
   "파티원 보호막 효과": 48,
   "파티원 회복 효과": 47,
 };
+
+const reduceOptionName = {
+  "추가 피해": "추피",
+  "적에게 주는 피해 증가": "적주피",
+  공격력: "공퍼",
+  "무기 공격력": "무공퍼",
+  "치명타 적중률": "치적",
+  "치명타 피해": "치피",
+  "공격력+": "깡공",
+  "무기 공격력+": "깡무공",
+};
+
 const optionValue = {
   추피: { 상: 260, 중: 160, 하: 60 },
   적주피: { 상: 200, 중: 120, 하: 55 },
@@ -120,7 +132,7 @@ function generateCombinationsFromPriority(priorityString, nameArray) {
   return Array.from(result).map((s) => s.split(","));
 }
 
-function getAllOptions(input) {
+function getAllOptions(input, checkbox) {
   const targets = ["상", "중", "하"];
   var possibleOptions;
   switch (input[0]) {
@@ -134,7 +146,7 @@ function getAllOptions(input) {
       possibleOptions = ["추피", "적주피"];
       break;
   }
-  possibleOptions.push("깡공", "깡무공");
+  if (checkbox) possibleOptions.push("깡공", "깡무공");
   var results = generateCombinationsFromPriority(input[2], possibleOptions);
   console.log(results);
   return results;
@@ -295,12 +307,15 @@ async function trySearch(form, pageNo) {
 }
 
 const SEARCH_DELAY = 0.2;
-async function getSearchResult(input, apikey) {
+async function getSearchResult(input, apikey, optionResult, checkbox) {
   var [accType, searchGrade, filter] = input;
   let count = 0;
-  var productsAll = [[],[],[],[]]; // 연마횟수 별 정렬
+  var productsAll = [[], [], [], []]; // 연마횟수 별 정렬
+  const optionList =
+    optionResult.length == 0 ? getAllOptions(input, checkbox) : optionResult;
+  console.log(optionList);
   for (var grindNum = input[2].length; grindNum <= 3; grindNum++) {
-    for (const options of getAllOptions(input)) {
+    for (const options of optionList) {
       count += 1;
       console.log(options, input);
       const form = {
@@ -330,7 +345,10 @@ async function getSearchResult(input, apikey) {
       var foundProducts = 0;
       while (
         products.length == 10 &&
-        foundProducts * getAllOptions(input).length * (4-input[2].length) < ProductNum
+        foundProducts *
+          getAllOptions(input, checkbox).length *
+          (4 - input[2].length) <
+          ProductNum
       ) {
         page += 1;
         await new Promise((resolve) =>
@@ -339,7 +357,11 @@ async function getSearchResult(input, apikey) {
         products = await trySearch(form, page);
         productsAll[grindNum].push(...products);
         foundProducts += products.filter((product) => product.price).length;
-        console.log(foundProducts, getAllOptions(input).length, ProductNum);
+        console.log(
+          foundProducts,
+          getAllOptions(input, checkbox).length,
+          ProductNum
+        );
       }
       await new Promise((resolve) => setTimeout(resolve, SEARCH_DELAY * 1000));
     }
@@ -373,7 +395,7 @@ function createChartAndOpenImage(result, input) {
     }
 
     // 데이터셋 준비
-    const datasets = []
+    const datasets = [];
     for (var grindNum = input[2].length; grindNum <= 3; grindNum++) {
       datasets.push({
         label: `${grindNum}연마`,
@@ -382,7 +404,7 @@ function createChartAndOpenImage(result, input) {
           y: item.buyPrice,
         })),
         pointRadius: 5,
-      })
+      });
     }
     // 3. 차트 생성
     const ctx = document.getElementById("scatter-chart").getContext("2d");
@@ -398,12 +420,17 @@ function createChartAndOpenImage(result, input) {
             callbacks: {
               label: (context) => {
                 const idx = context.dataIndex;
-                const grindIdx = context.datasetIndex+input[2].length;
+                const grindIdx = context.datasetIndex + input[2].length;
                 return `힘민지: ${result[grindIdx][idx].stat}-${
                   Math.round(context.raw.x * 100000) / 1000
                 }%, 골드: ${context.raw.y},\n${result[grindIdx][idx].effects
                   .slice(5)
-                  .map((item) => [item["OptionName"] + ": " + item["Value"] + "%".repeat(item["Value"]%1!=0)])}`;
+                  .map((item) => [
+                    item["OptionName"] +
+                      ": " +
+                      item["Value"] +
+                      "%".repeat(item["Value"] % 1 != 0),
+                  ])}`;
               },
             },
             bodyFont: { size: 14 },
@@ -454,7 +481,7 @@ function createChartAndOpenImage(result, input) {
           document.querySelector(".content--auction").appendChild(btn);
           if (elements.length > 0) {
             const index = elements[0].index;
-            const grindIdx = elements[0].datasetIndex+input[2].length;
+            const grindIdx = elements[0].datasetIndex + input[2].length;
             var grindOptions = result[grindIdx][index].effects.slice(5);
             const form = {
               itemName: result[grindIdx][index].name,
@@ -718,10 +745,71 @@ function findItemEqual(document, item) {
   });
   styleInput(gradeSelect);
 
+  // 모드 선택 (1: 텍스트, 2: 셋옵션)
+  const modeSelect = document.createElement("select");
+  ["특정등급필터", "특정옵션필터"].forEach((val) => {
+    const option = document.createElement("option");
+    option.value = val;
+    option.textContent = val;
+    modeSelect.appendChild(option);
+  });
+  styleInput(modeSelect);
+
   const textInput = document.createElement("input");
   textInput.type = "text";
-  textInput.placeholder = "연마 옵션 필터 (ex.상중)";
+  textInput.placeholder = "연마 옵션 등급 필터 (ex.상중)";
   styleInput(textInput);
+
+  const optionCheckbox = document.createElement("input");
+  optionCheckbox.type = "checkbox";
+  optionCheckbox.id = "myCheckbox";
+  optionCheckbox.checked = true;
+  optionCheckbox.style.margin = "0";
+
+  const checkboxLabel = document.createElement("label");
+  checkboxLabel.textContent = "깡공/깡무공 고려";
+  checkboxLabel.setAttribute("for", "myCheckbox");
+
+  // 스타일 통일을 위해 감싸는 div
+  const checkboxWrapper = document.createElement("div");
+  checkboxWrapper.style.display = "flex";
+  checkboxWrapper.style.alignItems = "center";
+  checkboxWrapper.style.gap = "0.3em";
+  checkboxWrapper.appendChild(checkboxLabel);
+  checkboxWrapper.appendChild(optionCheckbox);
+  checkboxWrapper.style.display = "flex";
+  checkboxWrapper.style.alignItems = "center";
+  checkboxWrapper.style.padding = "0.4em";
+  checkboxWrapper.style.border = "1px solid #777777";
+  checkboxWrapper.style.borderRadius = "3px";
+  checkboxWrapper.style.minWidth = "120px";
+  checkboxWrapper.style.boxSizing = "border-box";
+  checkboxWrapper.style.cursor = "pointer";
+  checkboxWrapper.style.gap = "0.5em";
+
+  // 6개의 select input 생성
+  const optionSelects = Array.from({ length: 6 }, (_, i) => {
+    const sel = document.createElement("select");
+    if (i % 2 == 0) {
+      ["", ...Object.keys(optionFullName).slice(0, 8)].forEach((val) => {
+        const opt = document.createElement("option");
+        opt.value = val;
+        opt.textContent = val || "옵션 선택";
+        sel.appendChild(opt);
+        styleInput(sel);
+      });
+    } else {
+      ["", "상", "중", "하"].forEach((val) => {
+        const opt = document.createElement("option");
+        opt.value = val;
+        opt.textContent = val || "등급";
+        sel.appendChild(opt);
+        styleInput(sel, "100px");
+      });
+    }
+
+    return sel;
+  });
 
   const submitInput = document.createElement("input");
   submitInput.type = "submit";
@@ -737,17 +825,46 @@ function findItemEqual(document, item) {
     e.preventDefault();
     const type = typeSelect.value;
     const grade = gradeSelect.value;
-    const shortText = textInput.value;
+    const mode = modeSelect.value;
     const longText = longTextInput.value;
-
-    handleInputs(type, grade, shortText, longText);
+    const checkboxState = optionCheckbox.checked;
+    if (mode === "특정등급필터") {
+      const shortText = textInput.value;
+      handleInputs(type, grade, mode, shortText, checkboxState, null, longText);
+    } else {
+      const options = optionSelects.map((sel) => sel.value);
+      handleInputs(type, grade, mode, null, null, options, longText);
+    }
   });
 
+  // DOM 구성
   inlineWrapper.appendChild(typeSelect);
   inlineWrapper.appendChild(gradeSelect);
-  inlineWrapper.appendChild(textInput);
+  inlineWrapper.appendChild(modeSelect);
+
+  // 이 부분은 mode에 따라 다르게 삽입됨
+  const inputAreaWrapper = document.createElement("div");
+  inputAreaWrapper.style.display = "flex";
+  inputAreaWrapper.style.flexWrap = "wrap";
+  inputAreaWrapper.style.gap = "0.5em";
+  inputAreaWrapper.style.justifyContent = "center";
+  inputAreaWrapper.appendChild(textInput); // 초기값은 textInput
+  inputAreaWrapper.appendChild(checkboxWrapper);
+
+  inlineWrapper.appendChild(inputAreaWrapper);
   inlineWrapper.appendChild(submitInput);
   container.appendChild(inlineWrapper);
+
+  // modeSelect 변경 이벤트
+  modeSelect.addEventListener("change", () => {
+    inputAreaWrapper.innerHTML = ""; // 초기화
+    if (modeSelect.value === "특정등급필터") {
+      inputAreaWrapper.appendChild(textInput);
+      inputAreaWrapper.appendChild(checkboxWrapper);
+    } else {
+      optionSelects.forEach((sel) => inputAreaWrapper.appendChild(sel));
+    }
+  });
 
   // 긴 입력 + 저장 버튼
   const longInputWrapper = document.createElement("div");
@@ -790,20 +907,45 @@ function findItemEqual(document, item) {
 
   form.insertBefore(container, form.firstChild);
 
-  function handleInputs(type, grade, shortText, longText) {
-    const input = [type, grade, shortText];
-    console.log(input);
+  function handleInputs(
+    type,
+    grade,
+    mode,
+    shortText,
+    checkbox,
+    options,
+    longText
+  ) {
+    const input = [];
     const apikey = longText;
-    console.log("타입:", type);
-    console.log("등급:", grade);
-    console.log("짧은 입력:", shortText);
-    console.log("긴 입력:", longText);
+    var optionResult = [];
     let result;
+    if (mode == "특정등급필터") {
+      input.push(type, grade, shortText);
+      console.log(input);
+      console.log("타입:", type);
+      console.log("등급:", grade);
+      console.log("짧은 입력:", shortText);
+      console.log("체크박스:", checkbox);
+      console.log("긴 입력:", longText);
+    } else {
+      input.push(type, grade, options[1] + options[3] + options[5]);
+      optionResult.push(
+        [options[0], options[2], options[4]].map(
+          (optionName) => reduceOptionName[optionName]
+        )
+      );
+      console.log(input);
+      console.log("타입:", type);
+      console.log("등급:", grade);
+      console.log("옵션:", options);
+      console.log("긴 입력:", longText);
+    }
     const btn = document.getElementById("copyBtn");
     if (btn) {
       btn.remove();
     }
-    getSearchResult(input, apikey).then((res) => {
+    getSearchResult(input, apikey, optionResult, checkbox).then((res) => {
       result = res;
       createChartAndOpenImage(result, input);
       // const el = document.createElement("button");
