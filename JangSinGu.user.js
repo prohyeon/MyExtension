@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         JangSinGu-SsalMukGi
 // @namespace    http://tampermonkey.net/
-// @version      2025-04-15
+// @version      2025-04-14-2
 // @description  로스트아크 경매장에서 장신구를 힘민지/골드 그래프로 보여줍니다.
 // @author       Graval504
 // @match        https://lostark.game.onstove.com/Auction
