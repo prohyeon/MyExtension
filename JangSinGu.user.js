@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         JangSinGu-SsalMukGi
 // @namespace    http://tampermonkey.net/
-// @version      2025-04-14-2
+// @version      2025-04-15
 // @description  로스트아크 경매장에서 장신구를 힘민지/골드 그래프로 보여줍니다.
 // @author       Graval504
 // @match        https://lostark.game.onstove.com/Auction
@@ -307,16 +307,19 @@ async function trySearch(form, pageNo) {
 }
 
 const SEARCH_DELAY = 0.2;
-async function getSearchResult(input, apikey, optionResult, checkbox) {
+async function getSearchResult(input, apikey, optionResult, checkbox, submitBtn) {
   var [accType, searchGrade, filter] = input;
   let count = 0;
   var productsAll = [[], [], [], []]; // 연마횟수 별 정렬
   const optionList =
     optionResult.length == 0 ? getAllOptions(input, checkbox) : optionResult;
   console.log(optionList);
+  const loopLength = (4-input[2].length)*(optionList.length);
   for (var grindNum = input[2].length; grindNum <= 3; grindNum++) {
     for (const options of optionList) {
       count += 1;
+      console.log(321, count, loopLength)
+      submitBtn.value = `${Math.round(count*100/loopLength)}%`
       console.log(options, input);
       const form = {
         apikey: apikey,
@@ -758,6 +761,7 @@ function findItemEqual(document, item) {
   const textInput = document.createElement("input");
   textInput.type = "text";
   textInput.placeholder = "연마 옵션 등급 필터 (ex.상중)";
+  textInput.setAttribute('autocomplete', 'off');
   styleInput(textInput);
 
   const optionCheckbox = document.createElement("input");
@@ -830,10 +834,10 @@ function findItemEqual(document, item) {
     const checkboxState = optionCheckbox.checked;
     if (mode === "특정등급필터") {
       const shortText = textInput.value;
-      handleInputs(type, grade, mode, shortText, checkboxState, null, longText);
+      handleInputs(type, grade, mode, shortText, checkboxState, null, longText, submitInput);
     } else {
       const options = optionSelects.map((sel) => sel.value);
-      handleInputs(type, grade, mode, null, null, options, longText);
+      handleInputs(type, grade, mode, null, null, options, longText, submitInput);
     }
   });
 
@@ -870,19 +874,45 @@ function findItemEqual(document, item) {
   const longInputWrapper = document.createElement("div");
   longInputWrapper.style.display = "flex";
   longInputWrapper.style.gap = "0.5em";
-  longInputWrapper.style.alignItems = "stretch";
+  longInputWrapper.style.alignItems = "center";
+  longInputWrapper.style.position = 'relative';
+  longInputWrapper.style.marginTop = '1em';
+  longInputWrapper.style.width = '100%';
 
   const longTextInput = document.createElement("input");
   longTextInput.type = "text";
   longTextInput.placeholder = "API Key";
   longTextInput.style.flex = "1";
-  longTextInput.style.padding = "0.5em";
+  longTextInput.style.padding = '0.4em 2.4em 0.4em 0.6em';  // 오른쪽 여백 확보
   longTextInput.style.boxSizing = "border-box";
+  longTextInput.setAttribute('autocomplete', 'off');
+
+  const faLink = document.createElement("link");
+  faLink.rel = "stylesheet";
+  faLink.href =
+    "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css";
+  document.head.appendChild(faLink);
+
+  const toggleIcon = document.createElement('i');
+  toggleIcon.className = 'fa-solid fa-eye-slash';
+  toggleIcon.style.position = 'absolute';
+  toggleIcon.style.top = '50%';
+  toggleIcon.style.right = '100px';
+  toggleIcon.style.transform = 'translateY(-50%)';
+  toggleIcon.style.cursor = 'pointer';
+  toggleIcon.style.color = '#888';
+
+  toggleIcon.addEventListener('click', () => {
+    const isPassword = longTextInput.type === 'password';
+    longTextInput.type = isPassword ? 'text' : 'password';
+    toggleIcon.className = isPassword ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye';
+  });
 
   // 저장 버튼 (input으로 변경)
   const saveButton = document.createElement("input");
   saveButton.type = "button";
   saveButton.value = "저장";
+  
   // 실행 버튼과 동일한 스타일 수동 적용
   saveButton.style.padding = "0.4em";
   saveButton.style.minWidth = "80px";
@@ -902,6 +932,7 @@ function findItemEqual(document, item) {
   }
 
   longInputWrapper.appendChild(longTextInput);
+  longInputWrapper.appendChild(toggleIcon);
   longInputWrapper.appendChild(saveButton);
   container.appendChild(longInputWrapper);
 
@@ -914,7 +945,8 @@ function findItemEqual(document, item) {
     shortText,
     checkbox,
     options,
-    longText
+    longText,
+    submitBtn
   ) {
     const input = [];
     const apikey = longText;
@@ -945,7 +977,7 @@ function findItemEqual(document, item) {
     if (btn) {
       btn.remove();
     }
-    getSearchResult(input, apikey, optionResult, checkbox).then((res) => {
+    getSearchResult(input, apikey, optionResult, checkbox, submitBtn).then((res) => {
       result = res;
       createChartAndOpenImage(result, input);
       // const el = document.createElement("button");
@@ -954,6 +986,7 @@ function findItemEqual(document, item) {
       // el.innerText = "검색 결과 복사";
       // el.onclick = copyResult;
       // document.body.prepend(el);
+      submitBtn.value="실행";
     });
   }
 })();
