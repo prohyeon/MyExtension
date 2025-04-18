@@ -374,6 +374,50 @@ async function getSearchResult(input, apikey, optionResult, checkbox, submitBtn)
 
 let originalResult = null; // 최초 데이터 저장용
 
+// 히스토리 저장용 배열
+let searchHistory = [];
+
+// 히스토리 UI 생성 및 관리 함수
+function renderHistoryUI() {
+  let historyWrapper = document.getElementById("history-wrapper");
+  if (!historyWrapper) {
+    historyWrapper = document.createElement("div");
+    historyWrapper.id = "history-wrapper";
+    historyWrapper.style.display = "flex";
+    historyWrapper.style.flexWrap = "wrap";
+    historyWrapper.style.gap = "0.5em";
+    historyWrapper.style.margin = "1em 0";
+    historyWrapper.style.padding = "0.5em 0";
+    historyWrapper.style.borderBottom = "1px solid #ddd";
+    document.querySelector("form").prepend(historyWrapper);
+  }
+  historyWrapper.innerHTML = "";
+  if (searchHistory.length === 0) {
+    const empty = document.createElement("span");
+    empty.textContent = "검색 히스토리 없음";
+    empty.style.color = "#aaa";
+    historyWrapper.appendChild(empty);
+    return;
+  }
+  searchHistory.forEach((entry, idx) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.style.padding = "0.4em 1em";
+    btn.style.border = "1px solid #888";
+    btn.style.borderRadius = "4px";
+    btn.style.background = idx === searchHistory.length-1 ? "#e0f7fa" : "#f8f8f8";
+    btn.style.cursor = "pointer";
+    btn.style.fontSize = "0.95em";
+    btn.title = entry.label;
+    btn.textContent = entry.label.length > 40 ? entry.label.slice(0, 40) + "…" : entry.label;
+    btn.onclick = () => {
+      originalResult = entry.result.map(arr => arr.slice());
+      updateChart(entry.result, entry.input);
+    };
+    historyWrapper.appendChild(btn);
+  });
+}
+
 function createChartAndOpenImage(result, input) {
   // 1. Chart.js 로드
   const script = document.createElement("script");
@@ -1015,13 +1059,20 @@ function findItemEqual(document, item) {
     getSearchResult(input, apikey, optionResult, checkbox, submitBtn).then((res) => {
       console.log('[!] 검색 결과:', res);
       result = res;
-      createChartAndOpenImage(result, input);
-      // const el = document.createElement("button");
-      // el.id = "copyBtn";
-      // el.style = "width: 100%; height: 64px; text-align: center";
-      // el.innerText = "검색 결과 복사";
-      // el.onclick = copyResult;
-      // document.body.prepend(el);
+      // 히스토리 추가
+      let label = `[${input[0]}][${input[1]}]`;
+      if (optionResult && optionResult.length && optionResult[0]) {
+        label += ` 옵션:${optionResult[0].join(",")}`;
+      } else if (input[2]) {
+        label += ` 등급:${input[2]}`;
+      }
+      searchHistory.push({
+        label,
+        input: JSON.parse(JSON.stringify(input)),
+        result: res.map(arr => arr.slice())
+      });
+      renderHistoryUI();
+      createChartAndOpenImage(res, input);
       submitBtn.value="실행";
     });
   }
