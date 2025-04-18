@@ -574,17 +574,20 @@ function updateChart(result, input) {
         if (elements.length > 0) {
           const index = elements[0].index;
           const grindIdx = elements[0].datasetIndex + input[2].length;
-          var grindOptions = result[grindIdx][index].effects.slice(5);
+          // 안전하게 데이터 접근 (result[grindIdx][index]가 없을 수 있음)
+          const item = result[grindIdx] && result[grindIdx][index];
+          if (!item) return;
+          var grindOptions = item.effects.slice(5);
           const form = {
-            itemName: result[grindIdx][index].name,
+            itemName: item.name,
             gradeQuality:
-              result[grindIdx][index].gradeQuality == 100
-                ? result[grindIdx][index].gradeQuality
-                : Math.floor(result[grindIdx][index].gradeQuality / 10) * 10,
+              item.gradeQuality == 100
+                ? item.gradeQuality
+                : Math.floor(item.gradeQuality / 10) * 10,
             category: category[input[0]],
-            grade: result[grindIdx][index].grade,
-            upgrade: result[grindIdx][index].grindNum,
-            enlightenment: result[grindIdx][index].effects[0]["Value"],
+            grade: item.grade,
+            upgrade: item.grindNum,
+            enlightenment: item.effects[0]["Value"],
             grindOption1: grindOptions[0] && {
               type: optionFullName[
                 grindOptions[0]["OptionName"] +
@@ -619,7 +622,8 @@ function updateChart(result, input) {
 
           while (!done) {
             var doc = await searchAuction(form, pageCount);
-            const id = findItemEqual(doc, result[grindIdx][index]);
+            // findItemEqual 내부에서 row가 없을 때 안전하게 처리
+            const id = findItemEqual(doc, item);
             if (id) {
               btn.dataset.productid = id;
               console.log(btn.dataset.productid);
@@ -747,38 +751,26 @@ function findItemEqual(document, item) {
         `#auctionListTbody > tr:nth-child(${index})`
       );
       if (!row) return false;
-      const buyPrice = parseFloat(
-        row
-          .querySelector(`td:nth-child(6) > div > em`)
-          .innerText.trim()
-          .replace(/,/g, "")
-      );
-      const name = row
-        .querySelector(`td:nth-child(1) > div.grade > span.name`)
-        .innerText.trim();
+      const priceEl = row.querySelector(`td:nth-child(6) > div > em`);
+      const nameEl = row.querySelector(`td:nth-child(1) > div.grade > span.name`);
+      const statEl = row.querySelector(`td:nth-child(1)>div.grade>span`);
+      const countEl = row.querySelector(`td:nth-child(1) > div.grade > span.count`);
+      const btnEl = row.querySelector("td:nth-child(7) > button");
+      if (!priceEl || !nameEl || !statEl || !countEl || !btnEl) return false;
+      const buyPrice = parseFloat(priceEl.innerText.trim().replace(/,/g, ""));
+      const name = nameEl.innerText.trim();
       const stat = parseInt(
-        JSON.parse(
-          row.querySelector(`td:nth-child(1)>div.grade>span`).dataset.item
-        ).Element_005.value.Element_001.match(
+        JSON.parse(statEl.dataset.item).Element_005.value.Element_001.match(
           /힘 \+(\d+)<BR>민첩 \+\1<BR>지능 \+\1/
         )[1]
       );
-      const tradeLeftStr = row
-        .querySelector(`td:nth-child(1) > div.grade > span.count`)
-        .innerText.trim();
+      const tradeLeftStr = countEl.innerText.trim();
       const tradeLeft =
         tradeLeftStr === "[구매 후 거래 불가]"
           ? 0
           : parseInt(tradeLeftStr.split("거래 ")[1].split("회")[0], 10);
-      const id = row
-        .querySelector("td:nth-child(7) > button")
-        .getAttribute("data-productid");
-      return id.repeat(
-        buyPrice == item.buyPrice &&
-          name == item.name &&
-          stat == item.effects[2]["Value"] &&
-          tradeLeft == item.tradeLeft
-      );
+      const id = btnEl.getAttribute("data-productid");
+      return id && buyPrice == item.buyPrice && name == item.name && stat == item.effects[2]["Value"] && tradeLeft == item.tradeLeft ? id : false;
     })
     .filter((x) => !!x)[0];
 }
