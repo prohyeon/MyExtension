@@ -372,6 +372,8 @@ async function getSearchResult(input, apikey, optionResult, checkbox, submitBtn)
   return productsAll;
 }
 
+let originalResult = null; // 최초 데이터 저장용
+
 function createChartAndOpenImage(result, input) {
   // 1. Chart.js 로드
   const script = document.createElement("script");
@@ -397,172 +399,204 @@ function createChartAndOpenImage(result, input) {
       document.querySelector("form").prepend(canvas);
     }
 
-    // 데이터셋 준비
-    const datasets = [];
-    for (var grindNum = input[2].length; grindNum <= 3; grindNum++) {
-      datasets.push({
-        label: `${grindNum}연마`,
-        data: result[grindNum].map((item) => ({
-          x: item.statPer,
-          y: item.buyPrice,
-        })),
-        pointRadius: 5,
-      });
+    // 가격 필터 UI 추가
+    let priceFilterWrapper = document.getElementById("price-filter-wrapper");
+    if (!priceFilterWrapper) {
+      priceFilterWrapper = document.createElement("div");
+      priceFilterWrapper.id = "price-filter-wrapper";
+      priceFilterWrapper.style.display = "flex";
+      priceFilterWrapper.style.gap = "0.5em";
+      priceFilterWrapper.style.alignItems = "center";
+      priceFilterWrapper.style.margin = "0.5em 0";
+      // 최대 가격 입력
+      const priceInput = document.createElement("input");
+      priceInput.type = "number";
+      priceInput.placeholder = "최대 가격(골드)";
+      priceInput.id = "max-price-input";
+      priceInput.style.padding = "0.4em";
+      priceInput.style.width = "120px";
+      // 적용 버튼
+      const applyBtn = document.createElement("button");
+      applyBtn.type = "button"
+      applyBtn.textContent = "적용";
+      applyBtn.style.padding = "0.4em 1em";
+      // 리셋 버튼
+      const resetBtn = document.createElement("button");
+      resetBtn.type = "button"
+      resetBtn.textContent = "리셋";
+      resetBtn.style.padding = "0.4em 1em";
+      // 이벤트
+      applyBtn.onclick = () => {
+        const maxPrice = Number(priceInput.value);
+        if (!originalResult) return;
+        // 필터링
+        const filtered = originalResult.map(arr =>
+          arr.filter(item => !maxPrice || item.buyPrice <= maxPrice)
+        );
+        updateChart(filtered, input);
+      };
+      resetBtn.onclick = () => {
+        if (!originalResult) return;
+        priceInput.value = "";
+        updateChart(originalResult, input);
+      };
+      priceFilterWrapper.appendChild(priceInput);
+      priceFilterWrapper.appendChild(applyBtn);
+      priceFilterWrapper.appendChild(resetBtn);
+      document.querySelector("form").prepend(priceFilterWrapper);
     }
-    // 3. 차트 생성
-    const ctx = document.getElementById("scatter-chart").getContext("2d");
-    window.myChart = new Chart(ctx, {
-      type: "scatter",
-      data: {
-        datasets: datasets,
-      },
-      options: {
-        responsive: true,
-        plugins: {
-          tooltip: {
-            callbacks: {
-              label: (context) => {
-                const idx = context.dataIndex;
-                const grindIdx = context.datasetIndex + input[2].length;
-                return `힘민지: ${result[grindIdx][idx].stat}-${
-                  Math.round(context.raw.x * 100000) / 1000
-                }%, 골드: ${context.raw.y},\n${result[grindIdx][idx].effects
-                  .slice(5)
-                  .map((item) => [
-                    item["OptionName"] +
-                      ": " +
-                      item["Value"] +
-                      "%".repeat(item["Value"] % 1 != 0),
-                  ])}`;
-              },
+    // 최초 데이터 저장
+    originalResult = result.map(arr => arr.slice());
+    // 차트 생성
+    updateChart(result, input);
+  };
+  document.head.appendChild(script);
+}
+
+function updateChart(result, input) {
+  const datasets = [];
+  for (var grindNum = input[2].length; grindNum <= 3; grindNum++) {
+    datasets.push({
+      label: `${grindNum}연마`,
+      data: result[grindNum].map((item) => ({
+        x: item.statPer,
+        y: item.buyPrice,
+      })),
+      pointRadius: 5,
+    });
+  }
+  const ctx = document.getElementById("scatter-chart").getContext("2d");
+  if (window.myChart) window.myChart.destroy();
+  window.myChart = new Chart(ctx, {
+    type: "scatter",
+    data: { datasets },
+    options: {
+      responsive: true,
+      plugins: {
+        tooltip: {
+          callbacks: {
+            label: (context) => {
+              const idx = context.dataIndex;
+              const grindIdx = context.datasetIndex + input[2].length;
+              return `힘민지: ${result[grindIdx][idx].stat}-${
+                Math.round(context.raw.x * 100000) / 1000
+              }%, 골드: ${context.raw.y},\n${result[grindIdx][idx].effects
+                .slice(5)
+                .map((item) => [
+                  item["OptionName"] +
+                    ": " +
+                    item["Value"] +
+                    "%".repeat(item["Value"] % 1 != 0),
+                ])}`;
             },
-            bodyFont: { size: 14 },
+          },
+          bodyFont: { size: 14 },
+        },
+        zoom: {
+          pan: {
+            enabled: true,
+            mode: "xy",
+            modifierKey: "ctrl",
           },
           zoom: {
-            pan: {
-              enabled: true,
-              mode: "xy",
-              modifierKey: "ctrl", // ctrl 키 누르고 드래그로 이동
-            },
-            zoom: {
-              wheel: {
-                enabled: true,
-              },
-              pinch: {
-                enabled: true,
-              },
-              mode: "xy",
-              onZoomStart: ({ chart, event }) => {
-                // Alt키 누르면 x축 줌만 허용
-                if (event.altKey) {
-                  chart.options.plugins.zoom.zoom.mode = "x";
-                  return true;
-                } else if (event.shiftKey) {
-                  chart.options.plugins.zoom.zoom.mode = "y";
-                  return true;
-                } else {
-                  return false; // 키 안 누르면 줌 안 됨
-                }
-              },
-              onZoomComplete: ({ chart }) => {
-                // 줌 끝난 뒤 모드 초기화 (안 해도 됨)
-                chart.options.plugins.zoom.zoom.mode = "xy";
-              },
-            },
-            limits: {
-              x: { min: 0, max: 1 }, // 줌 가능한 범위 제한
-              y: { min: 0 },
-            },
-          },
-        },
-        onClick: async (event, elements) => {
-          var btn = document.createElement("button");
-          btn.className = "button button--deal-buy";
-          btn.textContent = "구매하기";
-          btn.dataset.productid = null;
-          btn.hidden = true;
-          document.querySelector(".content--auction").appendChild(btn);
-          if (elements.length > 0) {
-            const index = elements[0].index;
-            const grindIdx = elements[0].datasetIndex + input[2].length;
-            var grindOptions = result[grindIdx][index].effects.slice(5);
-            const form = {
-              itemName: result[grindIdx][index].name,
-              gradeQuality:
-                result[grindIdx][index].gradeQuality == 100
-                  ? result[grindIdx][index].gradeQuality
-                  : Math.floor(result[grindIdx][index].gradeQuality / 10) * 10,
-              category: category[input[0]],
-              grade: result[grindIdx][index].grade,
-              upgrade: result[grindIdx][index].grindNum,
-              enlightenment: result[grindIdx][index].effects[0]["Value"],
-              grindOption1: grindOptions[0] && {
-                type: optionFullName[
-                  grindOptions[0]["OptionName"] +
-                    "+".repeat(!grindOptions[0]["IsPercentage"])
-                ],
-                grade: grindOptions[0]["IsPercentage"]
-                  ? grindOptions[0]["Value"] * 100
-                  : grindOptions[0]["Value"],
-              },
-              grindOption2: grindOptions[1] && {
-                type: optionFullName[
-                  grindOptions[1]["OptionName"] +
-                    "+".repeat(!grindOptions[1]["IsPercentage"])
-                ],
-                grade: grindOptions[1]["IsPercentage"]
-                  ? grindOptions[1]["Value"] * 100
-                  : grindOptions[1]["Value"],
-              },
-              grindOption3: grindOptions[2] && {
-                type: optionFullName[
-                  grindOptions[2]["OptionName"] +
-                    "+".repeat(!grindOptions[2]["IsPercentage"])
-                ],
-                grade: grindOptions[2]["IsPercentage"]
-                  ? grindOptions[2]["Value"] * 100
-                  : grindOptions[2]["Value"],
-              },
-            };
-            console.log(form);
-            var pageCount = 0;
-            var done = false;
-
-            while (!done) {
-              var doc = await searchAuction(form, pageCount);
-              const id = findItemEqual(doc, result[grindIdx][index]);
-              if (id) {
-                btn.dataset.productid = id;
-                console.log(btn.dataset.productid);
-                btn.click();
-                done = true;
-                btn.remove();
+            wheel: { enabled: true },
+            pinch: { enabled: true },
+            mode: "xy",
+            onZoomStart: ({ chart, event }) => {
+              if (event.altKey) {
+                chart.options.plugins.zoom.zoom.mode = "x";
+                return true;
+              } else if (event.shiftKey) {
+                chart.options.plugins.zoom.zoom.mode = "y";
+                return true;
+              } else {
+                return false;
               }
-              pageCount += 1;
-            }
-          }
-        },
-        scales: {
-          x: {
-            title: {
-              display: true,
-              text: "힘민지%",
-              font: { size: 24 },
+            },
+            onZoomComplete: ({ chart }) => {
+              chart.options.plugins.zoom.zoom.mode = "xy";
             },
           },
-          y: {
-            title: {
-              display: true,
-              text: "골드",
-              font: { size: 24 },
-            },
-          },
+          limits: { x: { min: 0, max: 1 }, y: { min: 0 } },
         },
       },
-    });
-  };
+      onClick: async (event, elements) => {
+        var btn = document.createElement("button");
+        btn.className = "button button--deal-buy";
+        btn.textContent = "구매하기";
+        btn.dataset.productid = null;
+        btn.hidden = true;
+        document.querySelector(".content--auction").appendChild(btn);
+        if (elements.length > 0) {
+          const index = elements[0].index;
+          const grindIdx = elements[0].datasetIndex + input[2].length;
+          var grindOptions = result[grindIdx][index].effects.slice(5);
+          const form = {
+            itemName: result[grindIdx][index].name,
+            gradeQuality:
+              result[grindIdx][index].gradeQuality == 100
+                ? result[grindIdx][index].gradeQuality
+                : Math.floor(result[grindIdx][index].gradeQuality / 10) * 10,
+            category: category[input[0]],
+            grade: result[grindIdx][index].grade,
+            upgrade: result[grindIdx][index].grindNum,
+            enlightenment: result[grindIdx][index].effects[0]["Value"],
+            grindOption1: grindOptions[0] && {
+              type: optionFullName[
+                grindOptions[0]["OptionName"] +
+                  "+".repeat(!grindOptions[0]["IsPercentage"])
+              ],
+              grade: grindOptions[0]["IsPercentage"]
+                ? grindOptions[0]["Value"] * 100
+                : grindOptions[0]["Value"],
+            },
+            grindOption2: grindOptions[1] && {
+              type: optionFullName[
+                grindOptions[1]["OptionName"] +
+                  "+".repeat(!grindOptions[1]["IsPercentage"])
+              ],
+              grade: grindOptions[1]["IsPercentage"]
+                ? grindOptions[1]["Value"] * 100
+                : grindOptions[1]["Value"],
+            },
+            grindOption3: grindOptions[2] && {
+              type: optionFullName[
+                grindOptions[2]["OptionName"] +
+                  "+".repeat(!grindOptions[2]["IsPercentage"])
+              ],
+              grade: grindOptions[2]["IsPercentage"]
+                ? grindOptions[2]["Value"] * 100
+                : grindOptions[2]["Value"],
+            },
+          };
+          console.log(form);
+          var pageCount = 0;
+          var done = false;
 
-  document.head.appendChild(script);
+          while (!done) {
+            var doc = await searchAuction(form, pageCount);
+            const id = findItemEqual(doc, result[grindIdx][index]);
+            if (id) {
+              btn.dataset.productid = id;
+              console.log(btn.dataset.productid);
+              btn.click();
+              done = true;
+              btn.remove();
+            }
+            pageCount += 1;
+          }
+        }
+      },
+      scales: {
+        x: {
+          title: { display: true, text: "힘민지%", font: { size: 24 } },
+        },
+        y: {
+          title: { display: true, text: "골드", font: { size: 24 } },
+        },
+      },
+    },
+  });
 }
 
 async function searchAuction(form, pageNo) {
@@ -789,6 +823,7 @@ function findItemEqual(document, item) {
   checkboxWrapper.style.minWidth = "120px";
   checkboxWrapper.style.boxSizing = "border-box";
   checkboxWrapper.style.cursor = "pointer";
+  checkboxWrapper.style.cursor = "pointer";
   checkboxWrapper.style.gap = "0.5em";
 
   // 6개의 select input 생성
@@ -978,6 +1013,7 @@ function findItemEqual(document, item) {
       btn.remove();
     }
     getSearchResult(input, apikey, optionResult, checkbox, submitBtn).then((res) => {
+      console.log('[!] 검색 결과:', res);
       result = res;
       createChartAndOpenImage(result, input);
       // const el = document.createElement("button");
