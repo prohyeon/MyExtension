@@ -64,8 +64,8 @@ const optionValue = {
   무공퍼: { 상: 300, 중: 180, 하: 80 },
   치적: { 상: 155, 중: 95, 하: 40 },
   치피: { 상: 400, 중: 240, 하: 110 },
-  깡공: { 하: 390 },
-  깡무공: { 하: 960 },
+  깡공: { 상: 390, 중: 195, 하: 80 },
+  깡무공: { 하: 960, 중: 480, 하: 195 },
 };
 const statRange = {
   200010: [12678, 15357],
@@ -109,7 +109,9 @@ function generateCombinationsFromPriority(priorityString, nameArray) {
       const normalized = mapped
         .slice()
         .sort((a, b) => {
-          if (a[1] !== b[1]) return b[1] - a[1]; // 우선순위 내림차순 (상 > 중 > 하)
+          if (a[1] !== b[1]) {
+            return b[1] - a[1]; // 우선순위 내림차순 (상 > 중 > 하)
+          }
           return a[0].localeCompare(b[0]); // 이름 정렬
         })
         .map((x) => x[0])
@@ -119,8 +121,12 @@ function generateCombinationsFromPriority(priorityString, nameArray) {
     }
 
     for (let i = 0; i < nameArray.length; i++) {
-      if (usedSet.has(i)) continue; // 이미 사용된 이름이면 건너뜀
-      if (!allowedPriority[i].includes(priorityInput[pos])) continue;
+      if (usedSet.has(i)) {
+        continue; // 이미 사용된 이름이면 건너뜀
+      }
+      if (!allowedPriority[i].includes(priorityInput[pos])) {
+        continue;
+      }
 
       usedSet.add(i);
       backtrack(pos + 1, [...path, i], usedSet);
@@ -146,7 +152,9 @@ function getAllOptions(input, checkbox) {
       possibleOptions = ["추피", "적주피"];
       break;
   }
-  if (checkbox) possibleOptions.push("깡공", "깡무공");
+  if (checkbox) {
+    possibleOptions.push("깡공", "깡무공");
+  }
   var results = generateCombinationsFromPriority(input[2], possibleOptions);
   console.log(results);
   return results;
@@ -169,9 +177,7 @@ function parse(jsonData, index, category) {
   }));
   const buyPrice = JsonItem["AuctionInfo"]["BuyPrice"];
   const auctionPrice = JsonItem["AuctionInfo"]["BidPrice"];
-  const stat = JsonItem["Options"].filter(
-    (item) => item["OptionName"] == "힘"
-  )[0]["Value"];
+  const stat = JsonItem["Options"].filter((item) => item["OptionName"] == "힘")[0]["Value"];
   const statPer =
     (stat -
       statRange[category][0] -
@@ -314,12 +320,12 @@ async function getSearchResult(input, apikey, optionResult, checkbox, submitBtn)
   const optionList =
     optionResult.length == 0 ? getAllOptions(input, checkbox) : optionResult;
   console.log(optionList);
-  const loopLength = (4-input[2].length)*(optionList.length);
+  const loopLength = (4 - input[2].length) * optionList.length;
   for (var grindNum = input[2].length; grindNum <= 3; grindNum++) {
     for (const options of optionList) {
       count += 1;
-      console.log(321, count, loopLength)
-      submitBtn.value = `${Math.round(count*100/loopLength)}%`
+      console.log(321, count, loopLength);
+      submitBtn.value = `${Math.round((count * 100) / loopLength)}%`;
       console.log(options, input);
       const form = {
         apikey: apikey,
@@ -405,13 +411,13 @@ function renderHistoryUI() {
     btn.style.padding = "0.4em 1em";
     btn.style.border = "1px solid #888";
     btn.style.borderRadius = "4px";
-    btn.style.background = idx === searchHistory.length-1 ? "#e0f7fa" : "#f8f8f8";
+    btn.style.background = idx === searchHistory.length - 1 ? "#e0f7fa" : "#f8f8f8";
     btn.style.cursor = "pointer";
     btn.style.fontSize = "0.95em";
     btn.title = entry.label;
     btn.textContent = entry.label.length > 40 ? entry.label.slice(0, 40) + "…" : entry.label;
     btn.onclick = () => {
-      originalResult = entry.result.map(arr => arr.slice());
+      originalResult = entry.result.map((arr) => arr.slice());
       updateChart(entry.result, entry.input);
     };
     historyWrapper.appendChild(btn);
@@ -461,26 +467,30 @@ function createChartAndOpenImage(result, input) {
       priceInput.style.width = "120px";
       // 적용 버튼
       const applyBtn = document.createElement("button");
-      applyBtn.type = "button"
+      applyBtn.type = "button";
       applyBtn.textContent = "적용";
       applyBtn.style.padding = "0.4em 1em";
       // 리셋 버튼
       const resetBtn = document.createElement("button");
-      resetBtn.type = "button"
+      resetBtn.type = "button";
       resetBtn.textContent = "리셋";
       resetBtn.style.padding = "0.4em 1em";
       // 이벤트
       applyBtn.onclick = () => {
         const maxPrice = Number(priceInput.value);
-        if (!originalResult) return;
+        if (!originalResult) {
+          return;
+        }
         // 필터링
-        const filtered = originalResult.map(arr =>
-          arr.filter(item => !maxPrice || item.buyPrice <= maxPrice)
+        const filtered = originalResult.map((arr) =>
+          arr.filter((item) => !maxPrice || item.buyPrice <= maxPrice)
         );
         updateChart(filtered, input);
       };
       resetBtn.onclick = () => {
-        if (!originalResult) return;
+        if (!originalResult) {
+          return;
+        }
         priceInput.value = "";
         updateChart(originalResult, input);
       };
@@ -490,11 +500,40 @@ function createChartAndOpenImage(result, input) {
       document.querySelector("form").prepend(priceFilterWrapper);
     }
     // 최초 데이터 저장
-    originalResult = result.map(arr => arr.slice());
+    originalResult = result.map((arr) => arr.slice());
     // 차트 생성
     updateChart(result, input);
   };
   document.head.appendChild(script);
+}
+
+function getOptionKey(effects) {
+  const mainOptions = Object.keys(reduceOptionName);
+  return (
+    mainOptions
+      .map((opt) =>
+        effects.some((e) => e.OptionName.includes(opt)) ? opt : ""
+      )
+      .filter(Boolean)
+      .join("+") || "기타"
+  );
+}
+
+// 주요 옵션 포함 개수에 따라 pointStyle 반환
+function getPointStyleByOption(effects) {
+  const mainOptions = Object.keys(reduceOptionName);
+  const count = mainOptions.filter((opt) =>
+    effects.some((e) => e.OptionName.includes(opt))
+  ).length;
+  if (count >= 3) {
+    return "star";
+  }
+
+  if (count === 2) {
+    return "circle";
+  }
+
+  return "rect";
 }
 
 function updateChart(result, input) {
@@ -506,11 +545,16 @@ function updateChart(result, input) {
         x: item.statPer,
         y: item.buyPrice,
       })),
-      pointRadius: 5,
+      pointRadius: 4,
+      pointStyle: result[grindNum].map((item) =>
+        getPointStyleByOption(item.effects)
+      ),
     });
   }
   const ctx = document.getElementById("scatter-chart").getContext("2d");
-  if (window.myChart) window.myChart.destroy();
+  if (window.myChart) {
+    window.myChart.destroy();
+  }
   window.myChart = new Chart(ctx, {
     type: "scatter",
     data: { datasets },
@@ -576,7 +620,9 @@ function updateChart(result, input) {
           const grindIdx = elements[0].datasetIndex + input[2].length;
           // 안전하게 데이터 접근 (result[grindIdx][index]가 없을 수 있음)
           const item = result[grindIdx] && result[grindIdx][index];
-          if (!item) return;
+          if (!item) {
+            return;
+          }
           var grindOptions = item.effects.slice(5);
           const form = {
             itemName: item.name,
@@ -750,13 +796,17 @@ function findItemEqual(document, item) {
       const row = document.querySelector(
         `#auctionListTbody > tr:nth-child(${index})`
       );
-      if (!row) return false;
+      if (!row) {
+        return false;
+      }
       const priceEl = row.querySelector(`td:nth-child(6) > div > em`);
       const nameEl = row.querySelector(`td:nth-child(1) > div.grade > span.name`);
       const statEl = row.querySelector(`td:nth-child(1)>div.grade>span`);
       const countEl = row.querySelector(`td:nth-child(1) > div.grade > span.count`);
       const btnEl = row.querySelector("td:nth-child(7) > button");
-      if (!priceEl || !nameEl || !statEl || !countEl || !btnEl) return false;
+      if (!priceEl || !nameEl || !statEl || !countEl || !btnEl) {
+        return false;
+      }
       const buyPrice = parseFloat(priceEl.innerText.trim().replace(/,/g, ""));
       const name = nameEl.innerText.trim();
       const stat = parseInt(
@@ -770,7 +820,13 @@ function findItemEqual(document, item) {
           ? 0
           : parseInt(tradeLeftStr.split("거래 ")[1].split("회")[0], 10);
       const id = btnEl.getAttribute("data-productid");
-      return id && buyPrice == item.buyPrice && name == item.name && stat == item.effects[2]["Value"] && tradeLeft == item.tradeLeft ? id : false;
+      return id &&
+        buyPrice == item.buyPrice &&
+        name == item.name &&
+        stat == item.effects[2]["Value"] &&
+        tradeLeft == item.tradeLeft
+        ? id
+        : false;
     })
     .filter((x) => !!x)[0];
 }
@@ -831,7 +887,7 @@ function findItemEqual(document, item) {
   const textInput = document.createElement("input");
   textInput.type = "text";
   textInput.placeholder = "연마 옵션 등급 필터 (ex.상중)";
-  textInput.setAttribute('autocomplete', 'off');
+  textInput.setAttribute("autocomplete", "off");
   styleInput(textInput);
 
   const optionCheckbox = document.createElement("input");
@@ -905,7 +961,16 @@ function findItemEqual(document, item) {
     const checkboxState = optionCheckbox.checked;
     if (mode === "특정등급필터") {
       const shortText = textInput.value;
-      handleInputs(type, grade, mode, shortText, checkboxState, null, longText, submitInput);
+      handleInputs(
+        type,
+        grade,
+        mode,
+        shortText,
+        checkboxState,
+        null,
+        longText,
+        submitInput
+      );
     } else {
       const options = optionSelects.map((sel) => sel.value);
       handleInputs(type, grade, mode, null, null, options, longText, submitInput);
@@ -946,17 +1011,17 @@ function findItemEqual(document, item) {
   longInputWrapper.style.display = "flex";
   longInputWrapper.style.gap = "0.5em";
   longInputWrapper.style.alignItems = "center";
-  longInputWrapper.style.position = 'relative';
-  longInputWrapper.style.marginTop = '1em';
-  longInputWrapper.style.width = '100%';
+  longInputWrapper.style.position = "relative";
+  longInputWrapper.style.marginTop = "1em";
+  longInputWrapper.style.width = "100%";
 
   const longTextInput = document.createElement("input");
   longTextInput.type = "text";
   longTextInput.placeholder = "API Key";
   longTextInput.style.flex = "1";
-  longTextInput.style.padding = '0.4em 2.4em 0.4em 0.6em';  // 오른쪽 여백 확보
+  longTextInput.style.padding = "0.4em 2.4em 0.4em 0.6em"; // 오른쪽 여백 확보
   longTextInput.style.boxSizing = "border-box";
-  longTextInput.setAttribute('autocomplete', 'off');
+  longTextInput.setAttribute("autocomplete", "off");
 
   const faLink = document.createElement("link");
   faLink.rel = "stylesheet";
@@ -964,26 +1029,28 @@ function findItemEqual(document, item) {
     "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css";
   document.head.appendChild(faLink);
 
-  const toggleIcon = document.createElement('i');
-  toggleIcon.className = 'fa-solid fa-eye-slash';
-  toggleIcon.style.position = 'absolute';
-  toggleIcon.style.top = '50%';
-  toggleIcon.style.right = '100px';
-  toggleIcon.style.transform = 'translateY(-50%)';
-  toggleIcon.style.cursor = 'pointer';
-  toggleIcon.style.color = '#888';
+  const toggleIcon = document.createElement("i");
+  toggleIcon.className = "fa-solid fa-eye-slash";
+  toggleIcon.style.position = "absolute";
+  toggleIcon.style.top = "50%";
+  toggleIcon.style.right = "100px";
+  toggleIcon.style.transform = "translateY(-50%)";
+  toggleIcon.style.cursor = "pointer";
+  toggleIcon.style.color = "#888";
 
-  toggleIcon.addEventListener('click', () => {
-    const isPassword = longTextInput.type === 'password';
-    longTextInput.type = isPassword ? 'text' : 'password';
-    toggleIcon.className = isPassword ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye';
+  toggleIcon.addEventListener("click", () => {
+    const isPassword = longTextInput.type === "password";
+    longTextInput.type = isPassword ? "text" : "password";
+    toggleIcon.className = isPassword
+      ? "fa-solid fa-eye-slash"
+      : "fa-solid fa-eye";
   });
 
   // 저장 버튼 (input으로 변경)
   const saveButton = document.createElement("input");
   saveButton.type = "button";
   saveButton.value = "저장";
-  
+
   // 실행 버튼과 동일한 스타일 수동 적용
   saveButton.style.padding = "0.4em";
   saveButton.style.minWidth = "80px";
@@ -1048,24 +1115,26 @@ function findItemEqual(document, item) {
     if (btn) {
       btn.remove();
     }
-    getSearchResult(input, apikey, optionResult, checkbox, submitBtn).then((res) => {
-      console.log('[!] 검색 결과:', res);
-      result = res;
-      // 히스토리 추가
-      let label = `[${input[0]}][${input[1]}]`;
-      if (optionResult && optionResult.length && optionResult[0]) {
-        label += ` 옵션:${optionResult[0].join(",")}`;
-      } else if (input[2]) {
-        label += ` 등급:${input[2]}`;
+    getSearchResult(input, apikey, optionResult, checkbox, submitBtn).then(
+      (res) => {
+        console.log("[!] 검색 결과:", res);
+        result = res;
+        // 히스토리 추가
+        let label = `[${input[0]}][${input[1]}]`;
+        if (optionResult && optionResult.length && optionResult[0]) {
+          label += ` 옵션:${optionResult[0].join(",")}`;
+        } else if (input[2]) {
+          label += ` 등급:${input[2]}`;
+        }
+        searchHistory.push({
+          label,
+          input: JSON.parse(JSON.stringify(input)),
+          result: res.map((arr) => arr.slice()),
+        });
+        renderHistoryUI();
+        createChartAndOpenImage(res, input);
+        submitBtn.value = "실행";
       }
-      searchHistory.push({
-        label,
-        input: JSON.parse(JSON.stringify(input)),
-        result: res.map(arr => arr.slice())
-      });
-      renderHistoryUI();
-      createChartAndOpenImage(res, input);
-      submitBtn.value="실행";
-    });
+    );
   }
 })();
