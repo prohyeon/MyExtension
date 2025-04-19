@@ -141,11 +141,33 @@ function styleInput(el, minWidth = "120px") {
   el.style.boxSizing = "border-box";
 }
 
-function createOptionSelects(optionFullName) {
+function createOptionSelects(optionFullName, accType) {
+  // 장신구별 옵션 배열 정의 (옵션 이름 그대로)
+  const accTypeOptions = {
+    목걸이: [
+      "적에게 주는 피해 증가",
+      "추가 피해",
+      "공격력+",
+      "무기 공격력+"
+    ],
+    귀걸이: [
+      "공격력",
+      "무기 공격력",
+      "공격력+",
+      "무기 공격력+"
+    ],
+    반지: [
+      "치명타 피해",
+      "치명타 적중률",
+      "공격력+",
+      "무기 공격력+"
+    ]
+  };
+  const options = accTypeOptions[accType] || Object.keys(optionFullName).slice(0, 8);
   return Array.from({ length: 6 }, (_, i) => {
     const sel = document.createElement("select");
     if (i % 2 == 0) {
-      ["", ...Object.keys(optionFullName).slice(0, 8)].forEach((val) => {
+      ["", ...options].forEach((val) => {
         const opt = document.createElement("option");
         opt.value = val;
         opt.textContent = val || "옵션 선택";
@@ -264,6 +286,9 @@ async function search(form, pageNo) {
       return res.json();
     })
     .then((jsonData) => {
+      if (!jsonData || typeof jsonData["TotalCount"] !== "number" || !jsonData["Items"]) {
+        return [];
+      }
       var index = Math.min(
         jsonData["TotalCount"] - (jsonData["PageNo"] - 1) * 10,
         10
@@ -383,13 +408,17 @@ function renderHistoryUI() {
     historyWrapper.appendChild(empty);
     return;
   }
+  // 선택된 히스토리 인덱스 추적
+  if (typeof window.selectedHistoryIdx !== "number") {
+    window.selectedHistoryIdx = searchHistory.length - 1;
+  }
   searchHistory.forEach((entry, idx) => {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.style.padding = "0.4em 1em";
     btn.style.border = "1px solid #888";
     btn.style.borderRadius = "4px";
-    btn.style.background = idx === searchHistory.length - 1 ? "#e0f7fa" : "#f8f8f8";
+    btn.style.background = idx === window.selectedHistoryIdx ? "#b2ebf2" : (idx === searchHistory.length - 1 ? "#e0f7fa" : "#f8f8f8");
     btn.style.cursor = "pointer";
     btn.style.fontSize = "0.95em";
     btn.title = entry.label;
@@ -397,7 +426,14 @@ function renderHistoryUI() {
     btn.onclick = () => {
       originalResult = entry.result.map((arr) => arr.slice());
       updateChart(entry.result, entry.input);
+      window.selectedHistoryIdx = idx;
+      renderHistoryUI(); // 다시 렌더링해서 선택 표시
     };
+    // 선택된 버튼에 테두리 강조
+    if (idx === window.selectedHistoryIdx) {
+      btn.style.outline = "2px solid #0288d1";
+      btn.style.fontWeight = "bold";
+    }
     historyWrapper.appendChild(btn);
   });
 }
@@ -438,24 +474,68 @@ function createChartAndOpenImage(result, input) {
       priceFilterWrapper.style.margin = "0.5em 0";
       // 최대 가격 입력
       const priceInput = document.createElement("input");
-      priceInput.type = "number";
+      priceInput.type = "text";
       priceInput.placeholder = "최대 가격(골드)";
       priceInput.id = "max-price-input";
       priceInput.style.padding = "0.4em";
       priceInput.style.width = "120px";
+      // 3자리마다 , 표시 (입력 중에도)
+      priceInput.addEventListener("input", (e) => {
+        // 숫자만 추출
+        let value = e.target.value.replace(/[^0-9]/g, "");
+        if (value) {
+          // 3자리마다 , 추가
+          value = value.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        }
+        e.target.value = value;
+      });
+
+      // +50,000 버튼 생성
+      const plusBtn = document.createElement("button");
+      plusBtn.type = "button";
+      plusBtn.textContent = "+50,000";
+      plusBtn.style.padding = "0.4em";
+      plusBtn.style.minWidth = "80px";
+      plusBtn.style.width = "80px";
+      plusBtn.style.boxSizing = "border-box";
+      plusBtn.style.cursor = "pointer";
+      plusBtn.style.border = "1px solid #888";
+      plusBtn.style.marginLeft = "0.2em";
+      plusBtn.onclick = () => {
+        // 현재 값에서 50,000 더하기
+        let value = priceInput.value.replace(/[^0-9]/g, "");
+        let num = Number(value) || 0;
+        num += 50000;
+        priceInput.value = num.toLocaleString();
+        priceInput.dispatchEvent(new Event("input")); // 포맷 유지
+      };
+
       // 적용 버튼
       const applyBtn = document.createElement("button");
       applyBtn.type = "button";
       applyBtn.textContent = "적용";
-      applyBtn.style.padding = "0.4em 1em";
+      applyBtn.style.padding = "0.4em";
+      applyBtn.style.minWidth = "80px";
+      applyBtn.style.width = "80px";
+      applyBtn.style.boxSizing = "border-box";
+      applyBtn.style.cursor = "pointer";
+      applyBtn.style.border = "1px solid #888"; 
+
       // 리셋 버튼
       const resetBtn = document.createElement("button");
       resetBtn.type = "button";
       resetBtn.textContent = "리셋";
-      resetBtn.style.padding = "0.4em 1em";
+      resetBtn.style.padding = "0.4em";
+      resetBtn.style.minWidth = "80px";
+      resetBtn.style.width = "80px";
+      resetBtn.style.boxSizing = "border-box";
+      resetBtn.style.cursor = "pointer";
+      resetBtn.style.border = "1px solid #888"; 
+      
       // 이벤트
       applyBtn.onclick = () => {
-        const maxPrice = Number(priceInput.value);
+        // 콤마 제거 후 숫자로 변환
+        const maxPrice = Number(priceInput.value.replace(/,/g, ""));
         if (!originalResult) {
           return;
         }
@@ -473,6 +553,7 @@ function createChartAndOpenImage(result, input) {
         updateChart(originalResult, input);
       };
       priceFilterWrapper.appendChild(priceInput);
+      priceFilterWrapper.appendChild(plusBtn);
       priceFilterWrapper.appendChild(applyBtn);
       priceFilterWrapper.appendChild(resetBtn);
       document.querySelector("form").prepend(priceFilterWrapper);
@@ -543,13 +624,38 @@ function getPointStyleByOption(effects) {
   };
 }
 
-// pointStyle, label 콜백 분리
 function getTooltipLabel(result, input, context) {
   const idx = context.dataIndex;
   const grindIdx = context.datasetIndex + input[2].length;
   const item = result[grindIdx][idx];
-  if (!item) return '';
-  return `힘민지: ${item.stat}-${Math.round(context.raw.x * 100000) / 1000}% | 거래횟수: ${item.tradeLeft}회 | 골드: ${context.raw.y} | \n${item.effects.slice(5).map((item) => [item["OptionName"] + ": " + item["Value"] + "%".repeat(item["Value"] % 1 != 0)]).join(' | ')}`;
+  
+  if (!item) {
+    return '';
+  }
+
+  // 1. stat 기반 딜증가량
+  let dmgInc = 0;
+  if (item.stat) {
+    dmgInc += (item.stat / 1000) * 0.12;
+  }
+
+  // 2. 옵션 기반 딜증가량
+  for (const eff of item.effects) {
+    // 무기 공격력(정수) → 252당 0.1%
+    if (eff.OptionName === "무기 공격력" && Number.isInteger(eff.Value)) {
+      dmgInc += (eff.Value / 252) * 0.1;
+    }
+    // 공격력(정수) → 102당 0.1%
+    if (eff.OptionName === "공격력" && Number.isInteger(eff.Value)) {
+      dmgInc += (eff.Value / 102) * 0.1;
+    }
+  }
+
+  const statPer = (Math.round(context.raw.x * 100000) / 1000).toFixed(2);
+  const dmgIncRounded = (Math.round(dmgInc * 100) / 100).toFixed(2);
+  const priceStr = context.raw.y.toLocaleString();
+
+  return `힘민지: ${item.stat}-${statPer}% | 힘민지 + 깡(공+무공) 딜 증가량: ${dmgIncRounded}% | 거래횟수: ${item.tradeLeft}회 | 골드: ${priceStr} | \n${item.effects.slice(5).map((item) => [item["OptionName"] + ": " + item["Value"] + "%".repeat(item["Value"] % 1 != 0)]).join(' | ')}`;
 }
 
 function makeDataset(result, input) {
@@ -822,6 +928,68 @@ function findItemEqual(document, item) {
     return;
   }
 
+  // 도움말(Help) 아이콘 및 팝오버 생성
+  const helpWrapper = document.createElement("div");
+  helpWrapper.style.position = "fixed";
+  helpWrapper.style.bottom = "24px";
+  helpWrapper.style.right = "32px";
+  helpWrapper.style.zIndex = "2000";
+
+  const helpIcon = document.createElement("i");
+  helpIcon.className = "fa-solid fa-circle-question";
+  helpIcon.style.fontSize = "2em";
+  helpIcon.style.color = "#0288d1";
+  helpIcon.style.cursor = "pointer";
+  helpIcon.title = "도움말 보기";
+
+  // 팝오버(툴팁) 내용
+  const helpPopover = document.createElement("div");
+  helpPopover.style.display = "none";
+  helpPopover.style.position = "absolute";
+  helpPopover.style.bottom = "2.5em";
+  helpPopover.style.right = "0";
+  helpPopover.style.background = "#fff";
+  helpPopover.style.border = "1px solid #bbb";
+  helpPopover.style.borderRadius = "8px";
+  helpPopover.style.boxShadow = "0 2px 8px rgba(0,0,0,0.08)";
+  helpPopover.style.padding = "1em";
+  helpPopover.style.fontSize = "0.98em";
+  helpPopover.style.lineHeight = "1.6";
+  helpPopover.style.minWidth = "260px";
+  helpPopover.style.maxWidth = "320px";
+  helpPopover.style.zIndex = "2001";
+  helpPopover.innerHTML = `
+    <b>JangSinGu-SsalMukGi 도움말</b><br>
+    <ul style="padding-left:1.2em;margin:0;">
+      <li><b>특정등급필터</b>: 예) <code>상중</code> 입력시, 해당 등급 조합으로 검색</li>
+      <li><b>특정옵션필터</b>: 옵션을 직접 선택하여 검색</li>
+      <li><b>히스토리</b>: 이전 검색을 클릭해 결과를 다시 볼 수 있음</li>
+      <li><b>차트</b>: 점 클릭 시 해당 아이템 구매창 이동</li>
+      <li><b>가격 필터</b>: 최대 가격 입력 후 적용 버튼 클릭</li>
+      <li><b>연마단계</b>: 검색 후 그래프위에 연마단계를 누르면 제외할 수 있음</li>
+    </ul>
+    <div style="text-align:right;margin-top:0.5em;">
+      <button id="help-close-btn" type="button" style="padding:0.2em 0.8em;font-size:1em;">닫기</button>
+    </div>
+  `;
+
+  helpIcon.onclick = () => {
+    helpPopover.style.display = helpPopover.style.display === "none" ? "block" : "none";
+  };
+  helpPopover.querySelector("#help-close-btn").onclick = () => {
+    helpPopover.style.display = "none";
+  };
+
+  helpWrapper.appendChild(helpIcon);
+  helpWrapper.appendChild(helpPopover);
+
+  // body에 부착 (fixed)
+  document.body.appendChild(helpWrapper);
+ 
+   // form에 상대적으로 배치
+   form.style.position = "relative";
+   form.appendChild(helpWrapper);
+
   // form이 발견되면 실행
   const container = document.createElement("div");
   container.style.marginBottom = "1em";
@@ -863,7 +1031,7 @@ function findItemEqual(document, item) {
 
   const textInput = document.createElement("input");
   textInput.type = "text";
-  textInput.placeholder = "연마 옵션 등급 필터 (ex.상중)";
+  textInput.placeholder = "연마옵션 (ex.상중)";
   textInput.setAttribute("autocomplete", "off");
   styleInput(textInput);
 
@@ -896,7 +1064,7 @@ function findItemEqual(document, item) {
   checkboxWrapper.style.gap = "0.5em";
 
   // 6개의 select input 생성
-  const optionSelects = createOptionSelects(optionFullName);
+  let optionSelects = createOptionSelects(optionFullName, typeSelect.value);
 
   const submitInput = document.createElement("input");
   submitInput.type = "submit";
@@ -958,6 +1126,16 @@ function findItemEqual(document, item) {
       inputAreaWrapper.appendChild(textInput);
       inputAreaWrapper.appendChild(checkboxWrapper);
     } else {
+      optionSelects = createOptionSelects(optionFullName, typeSelect.value);
+      optionSelects.forEach((sel) => inputAreaWrapper.appendChild(sel));
+    }
+  });
+
+  // typeSelect 변경 이벤트
+  typeSelect.addEventListener("change", () => {
+    if (modeSelect.value === "특정옵션필터") {
+      inputAreaWrapper.innerHTML = ""; // 초기화
+      optionSelects = createOptionSelects(optionFullName, typeSelect.value);
       optionSelects.forEach((sel) => inputAreaWrapper.appendChild(sel));
     }
   });
@@ -1078,7 +1256,14 @@ function findItemEqual(document, item) {
         // 히스토리 추가
         let label = `[${input[0]}][${input[1]}]`;
         if (optionResult && optionResult.length && optionResult[0]) {
-          label += ` 옵션:${optionResult[0].join(",")}`;
+          // 특정옵션필터일 때는 options 원본을 중복 없이 join
+          if (mode === "특정옵션필터" && options) {
+            // 전체 options에서 undefined/빈값/중복 제거
+            const filtered = options.filter((v, i, arr) => v && arr.indexOf(v) === i);
+            label += ` 옵션:${filtered.join(",")}`;
+          } else {
+            label += ` 옵션:${optionResult[0].join(",")}`;
+          }
         } else if (input[2]) {
           label += ` 등급:${input[2]}`;
         }
@@ -1087,6 +1272,8 @@ function findItemEqual(document, item) {
           input: JSON.parse(JSON.stringify(input)),
           result: res.map((arr) => arr.slice()),
         });
+        // 새 히스토리 추가 시 선택 인덱스를 마지막으로 이동
+        window.selectedHistoryIdx = searchHistory.length - 1;
         renderHistoryUI();
         createChartAndOpenImage(res, input);
         submitBtn.value = "실행";
