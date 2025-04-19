@@ -88,76 +88,81 @@ function normalizeArray(arr) {
   return arr.map((item) => (Array.isArray(item) ? item : [item]));
 }
 
+// 우선순위 조합 생성 (backtrack 분리)
 function generateCombinationsFromPriority(priorityString, nameArray) {
   const result = new Set();
-
-  // "상", "중", "하" → 3, 2, 1
   const priorityMap = { 상: 3, 중: 2, 하: 1 };
   const priorityInput = priorityString.split("").map((k) => priorityMap[k]);
-
-  // 각 name의 index → 허용 우선순위
   const allowedPriority = {
-    0: [1, 2, 3], // nameArray[0]
-    1: [1, 2, 3], // nameArray[1]
-    2: [1], // nameArray[2]
-    3: [1], // nameArray[3]
+    0: [1, 2, 3],
+    1: [1, 2, 3],
+    2: [1],
+    3: [1],
   };
-
   function backtrack(pos, path, usedSet) {
     if (pos === priorityInput.length) {
       const mapped = path.map((idx, i) => [nameArray[idx], priorityInput[i]]);
       const normalized = mapped
         .slice()
-        .sort((a, b) => {
-          if (a[1] !== b[1]) {
-            return b[1] - a[1]; // 우선순위 내림차순 (상 > 중 > 하)
-          }
-          return a[0].localeCompare(b[0]); // 이름 정렬
-        })
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
         .map((x) => x[0])
         .join(",");
       result.add(normalized);
       return;
     }
-
     for (let i = 0; i < nameArray.length; i++) {
-      if (usedSet.has(i)) {
-        continue; // 이미 사용된 이름이면 건너뜀
-      }
-      if (!allowedPriority[i].includes(priorityInput[pos])) {
-        continue;
-      }
-
+      if (usedSet.has(i) || !allowedPriority[i].includes(priorityInput[pos])) continue;
       usedSet.add(i);
       backtrack(pos + 1, [...path, i], usedSet);
       usedSet.delete(i);
     }
   }
-
   backtrack(0, [], new Set());
   return Array.from(result).map((s) => s.split(","));
 }
 
+// 옵션 조합 생성 (switch-case depth 감소)
 function getAllOptions(input, checkbox) {
-  const targets = ["상", "중", "하"];
-  var possibleOptions;
-  switch (input[0]) {
-    case "반지":
-      possibleOptions = ["치적", "치피"];
-      break;
-    case "귀걸이":
-      possibleOptions = ["공퍼", "무공퍼"];
-      break;
-    case "목걸이":
-      possibleOptions = ["추피", "적주피"];
-      break;
-  }
-  if (checkbox) {
-    possibleOptions.push("깡공", "깡무공");
-  }
-  var results = generateCombinationsFromPriority(input[2], possibleOptions);
-  console.log(results);
-  return results;
+  const accTypeOptions = {
+    반지: ["치적", "치피"],
+    귀걸이: ["공퍼", "무공퍼"],
+    목걸이: ["추피", "적주피"],
+  };
+  const possibleOptions = [...accTypeOptions[input[0]]];
+  if (checkbox) possibleOptions.push("깡공", "깡무공");
+  return generateCombinationsFromPriority(input[2], possibleOptions);
+}
+
+// 반복되는 styleInput, optionSelects 생성 분리
+function styleInput(el, minWidth = "120px") {
+  el.style.padding = "0.4em";
+  el.style.minWidth = minWidth;
+  el.style.flex = "1 1 auto";
+  el.style.boxSizing = "border-box";
+}
+
+function createOptionSelects(optionFullName) {
+  return Array.from({ length: 6 }, (_, i) => {
+    const sel = document.createElement("select");
+    if (i % 2 == 0) {
+      ["", ...Object.keys(optionFullName).slice(0, 8)].forEach((val) => {
+        const opt = document.createElement("option");
+        opt.value = val;
+        opt.textContent = val || "옵션 선택";
+        sel.appendChild(opt);
+        styleInput(sel);
+      });
+    } else {
+      ["", "상", "중", "하"].forEach((val) => {
+        const opt = document.createElement("option");
+        opt.value = val;
+        opt.textContent = val || "등급";
+        sel.appendChild(opt);
+        styleInput(sel, "100px");
+      });
+    }
+    return sel;
+  });
 }
 
 function parse(jsonData, index, category) {
@@ -314,63 +319,36 @@ async function trySearch(form, pageNo) {
 
 const SEARCH_DELAY = 0.2;
 async function getSearchResult(input, apikey, optionResult, checkbox, submitBtn) {
-  var [accType, searchGrade, filter] = input;
+  const [accType, searchGrade, filter] = input;
   let count = 0;
-  var productsAll = [[], [], [], []]; // 연마횟수 별 정렬
-  const optionList =
-    optionResult.length == 0 ? getAllOptions(input, checkbox) : optionResult;
-  console.log(optionList);
+  const productsAll = [[], [], [], []];
+  const optionList = optionResult.length === 0 ? getAllOptions(input, checkbox) : optionResult;
   const loopLength = (4 - input[2].length) * optionList.length;
-  for (var grindNum = input[2].length; grindNum <= 3; grindNum++) {
+  for (let grindNum = input[2].length; grindNum <= 3; grindNum++) {
     for (const options of optionList) {
-      count += 1;
-      console.log(321, count, loopLength);
+      count++;
       submitBtn.value = `${Math.round((count * 100) / loopLength)}%`;
-      console.log(options, input);
       const form = {
-        apikey: apikey,
+        apikey,
         category: category[accType],
         grade: searchGrade,
         upgrade: grindNum,
-        enlightenment:
-          GetEnlightenment(grade[searchGrade] - 5, grindNum) +
-          Number(accType == "목걸이"),
-        grindOption1: input[2][0] && {
-          type: option[options[0]],
-          grade: optionValue[options[0]][input[2][0]],
-        },
-        grindOption2: input[2][1] && {
-          type: option[options[1]],
-          grade: optionValue[options[1]][input[2][1]],
-        },
-        grindOption3: input[2][2] && {
-          type: option[options[2]],
-          grade: optionValue[options[2]][input[2][2]],
-        },
+        enlightenment: GetEnlightenment(grade[searchGrade] - 5, grindNum) + Number(accType === "목걸이"),
+        grindOption1: input[2][0] && { type: option[options[0]], grade: optionValue[options[0]][input[2][0]] },
+        grindOption2: input[2][1] && { type: option[options[1]], grade: optionValue[options[1]][input[2][1]] },
+        grindOption3: input[2][2] && { type: option[options[2]], grade: optionValue[options[2]][input[2][2]] },
       };
-      var products = await trySearch(form, 1);
+      let products = await trySearch(form, 1);
       productsAll[grindNum].push(...products);
-      var page = 1;
-      var foundProducts = 0;
-      while (
-        products.length == 10 &&
-        foundProducts *
-          getAllOptions(input, checkbox).length *
-          (4 - input[2].length) <
-          ProductNum
-      ) {
-        page += 1;
-        await new Promise((resolve) =>
-          setTimeout(resolve, SEARCH_DELAY * 1000)
-        );
+      let page = 1;
+      let foundProducts = 0;
+      // getAllOptions 반복 제거, foundProducts 계산 개선
+      while (products.length === 10 && foundProducts < ProductNum) {
+        page++;
+        await new Promise((resolve) => setTimeout(resolve, SEARCH_DELAY * 1000));
         products = await trySearch(form, page);
         productsAll[grindNum].push(...products);
         foundProducts += products.filter((product) => product.price).length;
-        console.log(
-          foundProducts,
-          getAllOptions(input, checkbox).length,
-          ProductNum
-        );
       }
       await new Promise((resolve) => setTimeout(resolve, SEARCH_DELAY * 1000));
     }
@@ -536,25 +514,33 @@ function getPointStyleByOption(effects) {
   return "rect";
 }
 
-function updateChart(result, input) {
+// pointStyle, label 콜백 분리
+function getTooltipLabel(result, input, context) {
+  const idx = context.dataIndex;
+  const grindIdx = context.datasetIndex + input[2].length;
+  const item = result[grindIdx][idx];
+  if (!item) return '';
+  return `힘민지: ${item.stat}-${Math.round(context.raw.x * 100000) / 1000}%, 골드: ${context.raw.y},\n${item.effects.slice(5).map((item) => [item["OptionName"] + ": " + item["Value"] + "%".repeat(item["Value"] % 1 != 0)]).join(', ')}`;
+}
+
+function makeDataset(result, input) {
   const datasets = [];
-  for (var grindNum = input[2].length; grindNum <= 3; grindNum++) {
+  for (let grindNum = input[2].length; grindNum <= 3; grindNum++) {
+    const dataArr = result[grindNum] || [];
     datasets.push({
       label: `${grindNum}연마`,
-      data: result[grindNum].map((item) => ({
-        x: item.statPer,
-        y: item.buyPrice,
-      })),
+      data: dataArr.map((item) => ({ x: item.statPer, y: item.buyPrice })),
       pointRadius: 4,
-      pointStyle: result[grindNum].map((item) =>
-        getPointStyleByOption(item.effects)
-      ),
+      pointStyle: dataArr.map((item) => getPointStyleByOption(item.effects)),
     });
   }
+  return datasets;
+}
+
+function updateChart(result, input) {
+  const datasets = makeDataset(result, input);
   const ctx = document.getElementById("scatter-chart").getContext("2d");
-  if (window.myChart) {
-    window.myChart.destroy();
-  }
+  if (window.myChart) window.myChart.destroy();
   window.myChart = new Chart(ctx, {
     type: "scatter",
     data: { datasets },
@@ -563,134 +549,85 @@ function updateChart(result, input) {
       plugins: {
         tooltip: {
           callbacks: {
-            label: (context) => {
-              const idx = context.dataIndex;
-              const grindIdx = context.datasetIndex + input[2].length;
-              return `힘민지: ${result[grindIdx][idx].stat}-${
-                Math.round(context.raw.x * 100000) / 1000
-              }%, 골드: ${context.raw.y},\n${result[grindIdx][idx].effects
-                .slice(5)
-                .map((item) => [
-                  item["OptionName"] +
-                    ": " +
-                    item["Value"] +
-                    "%".repeat(item["Value"] % 1 != 0),
-                ])}`;
-            },
+            label: (context) => getTooltipLabel(result, input, context),
           },
           bodyFont: { size: 14 },
         },
         zoom: {
-          pan: {
-            enabled: true,
-            mode: "xy",
-            modifierKey: "ctrl",
-          },
+          pan: { enabled: true, mode: "xy", modifierKey: "ctrl" },
           zoom: {
             wheel: { enabled: true },
             pinch: { enabled: true },
             mode: "xy",
             onZoomStart: ({ chart, event }) => {
-              if (event.altKey) {
-                chart.options.plugins.zoom.zoom.mode = "x";
-                return true;
-              } else if (event.shiftKey) {
-                chart.options.plugins.zoom.zoom.mode = "y";
-                return true;
-              } else {
-                return false;
-              }
+              if (event.altKey) { chart.options.plugins.zoom.zoom.mode = "x"; return true; }
+              if (event.shiftKey) { chart.options.plugins.zoom.zoom.mode = "y"; return true; }
+              return false;
             },
-            onZoomComplete: ({ chart }) => {
-              chart.options.plugins.zoom.zoom.mode = "xy";
-            },
+            onZoomComplete: ({ chart }) => { chart.options.plugins.zoom.zoom.mode = "xy"; },
           },
           limits: { x: { min: 0, max: 1 }, y: { min: 0 } },
         },
       },
-      onClick: async (event, elements) => {
-        var btn = document.createElement("button");
-        btn.className = "button button--deal-buy";
-        btn.textContent = "구매하기";
-        btn.dataset.productid = null;
-        btn.hidden = true;
-        document.querySelector(".content--auction").appendChild(btn);
-        if (elements.length > 0) {
-          const index = elements[0].index;
-          const grindIdx = elements[0].datasetIndex + input[2].length;
-          // 안전하게 데이터 접근 (result[grindIdx][index]가 없을 수 있음)
-          const item = result[grindIdx] && result[grindIdx][index];
-          if (!item) {
-            return;
-          }
-          var grindOptions = item.effects.slice(5);
-          const form = {
-            itemName: item.name,
-            gradeQuality:
-              item.gradeQuality == 100
-                ? item.gradeQuality
-                : Math.floor(item.gradeQuality / 10) * 10,
-            category: category[input[0]],
-            grade: item.grade,
-            upgrade: item.grindNum,
-            enlightenment: item.effects[0]["Value"],
-            grindOption1: grindOptions[0] && {
-              type: optionFullName[
-                grindOptions[0]["OptionName"] +
-                  "+".repeat(!grindOptions[0]["IsPercentage"])
-              ],
-              grade: grindOptions[0]["IsPercentage"]
-                ? grindOptions[0]["Value"] * 100
-                : grindOptions[0]["Value"],
-            },
-            grindOption2: grindOptions[1] && {
-              type: optionFullName[
-                grindOptions[1]["OptionName"] +
-                  "+".repeat(!grindOptions[1]["IsPercentage"])
-              ],
-              grade: grindOptions[1]["IsPercentage"]
-                ? grindOptions[1]["Value"] * 100
-                : grindOptions[1]["Value"],
-            },
-            grindOption3: grindOptions[2] && {
-              type: optionFullName[
-                grindOptions[2]["OptionName"] +
-                  "+".repeat(!grindOptions[2]["IsPercentage"])
-              ],
-              grade: grindOptions[2]["IsPercentage"]
-                ? grindOptions[2]["Value"] * 100
-                : grindOptions[2]["Value"],
-            },
-          };
-          console.log(form);
-          var pageCount = 0;
-          var done = false;
-
-          while (!done) {
-            var doc = await searchAuction(form, pageCount);
-            // findItemEqual 내부에서 row가 없을 때 안전하게 처리
-            const id = findItemEqual(doc, item);
-            if (id) {
-              btn.dataset.productid = id;
-              console.log(btn.dataset.productid);
-              btn.click();
-              done = true;
-              btn.remove();
-            }
-            pageCount += 1;
-          }
-        }
-      },
+      onClick: handleChartClick(result, input),
       scales: {
-        x: {
-          title: { display: true, text: "힘민지%", font: { size: 24 } },
-        },
-        y: {
-          title: { display: true, text: "골드", font: { size: 24 } },
-        },
+        x: { title: { display: true, text: "힘민지%", font: { size: 24 } } },
+        y: { title: { display: true, text: "골드", font: { size: 24 } } },
       },
     },
   });
+}
+
+// 차트 클릭 핸들러 분리
+function handleChartClick(result, input) {
+  return async (event, elements) => {
+    var btn = document.createElement("button");
+    btn.className = "button button--deal-buy";
+    btn.textContent = "구매하기";
+    btn.dataset.productid = null;
+    btn.hidden = true;
+    document.querySelector(".content--auction").appendChild(btn);
+    if (elements.length > 0) {
+      const index = elements[0].index;
+      const grindIdx = elements[0].datasetIndex + input[2].length;
+      const item = result[grindIdx] && result[grindIdx][index];
+      if (!item) return;
+      var grindOptions = item.effects.slice(5);
+      const form = {
+        itemName: item.name,
+        gradeQuality: item.gradeQuality == 100 ? item.gradeQuality : Math.floor(item.gradeQuality / 10) * 10,
+        category: category[input[0]],
+        grade: item.grade,
+        upgrade: item.grindNum,
+        enlightenment: item.effects[0]["Value"],
+        grindOption1: grindOptions[0] && {
+          type: optionFullName[grindOptions[0]["OptionName"] + "+".repeat(!grindOptions[0]["IsPercentage"])],
+          grade: grindOptions[0]["IsPercentage"] ? grindOptions[0]["Value"] * 100 : grindOptions[0]["Value"],
+        },
+        grindOption2: grindOptions[1] && {
+          type: optionFullName[grindOptions[1]["OptionName"] + "+".repeat(!grindOptions[1]["IsPercentage"])],
+          grade: grindOptions[1]["IsPercentage"] ? grindOptions[1]["Value"] * 100 : grindOptions[1]["Value"],
+        },
+        grindOption3: grindOptions[2] && {
+          type: optionFullName[grindOptions[2]["OptionName"] + "+".repeat(!grindOptions[2]["IsPercentage"])],
+          grade: grindOptions[2]["IsPercentage"] ? grindOptions[2]["Value"] * 100 : grindOptions[2]["Value"],
+        },
+      };
+      var pageCount = 0;
+      var done = false;
+      while (!done) {
+        var doc = await searchAuction(form, pageCount);
+        const id = findItemEqual(doc, item);
+        if (id) {
+          btn.dataset.productid = id;
+          btn.click();
+          done = true;
+          btn.remove();
+        }
+        pageCount += 1;
+      }
+    }
+  };
 }
 
 async function searchAuction(form, pageNo) {
@@ -849,13 +786,6 @@ function findItemEqual(document, item) {
   inlineWrapper.style.gap = "0.5em";
   inlineWrapper.style.marginBottom = "0.5em";
 
-  const styleInput = (el, minWidth = "120px") => {
-    el.style.padding = "0.4em";
-    el.style.minWidth = minWidth;
-    el.style.flex = "1 1 auto";
-    el.style.boxSizing = "border-box";
-  };
-
   const typeSelect = document.createElement("select");
   ["목걸이", "귀걸이", "반지"].forEach((optionText) => {
     const option = document.createElement("option");
@@ -919,28 +849,7 @@ function findItemEqual(document, item) {
   checkboxWrapper.style.gap = "0.5em";
 
   // 6개의 select input 생성
-  const optionSelects = Array.from({ length: 6 }, (_, i) => {
-    const sel = document.createElement("select");
-    if (i % 2 == 0) {
-      ["", ...Object.keys(optionFullName).slice(0, 8)].forEach((val) => {
-        const opt = document.createElement("option");
-        opt.value = val;
-        opt.textContent = val || "옵션 선택";
-        sel.appendChild(opt);
-        styleInput(sel);
-      });
-    } else {
-      ["", "상", "중", "하"].forEach((val) => {
-        const opt = document.createElement("option");
-        opt.value = val;
-        opt.textContent = val || "등급";
-        sel.appendChild(opt);
-        styleInput(sel, "100px");
-      });
-    }
-
-    return sel;
-  });
+  const optionSelects = createOptionSelects(optionFullName);
 
   const submitInput = document.createElement("input");
   submitInput.type = "submit";
