@@ -500,18 +500,47 @@ function getOptionKey(effects) {
 // 주요 옵션 포함 개수에 따라 pointStyle 반환
 function getPointStyleByOption(effects) {
   const mainOptions = Object.keys(reduceOptionName);
-  const count = mainOptions.filter((opt) =>
-    effects.some((e) => e.OptionName.includes(opt))
-  ).length;
+  const count = mainOptions.filter((opt) => {
+    // 예외 처리: +가 붙은 옵션은 IsPercentage: false, 아닌 옵션은 IsPercentage: true
+    if (opt === "공격력") {
+      return effects.some(
+        (e) => e.OptionName === "공격력" && e.IsPercentage === true
+      );
+    }
+    if (opt === "공격력+") {
+      return effects.some(
+        (e) => e.OptionName === "공격력" && e.IsPercentage === false
+      );
+    }
+    if (opt === "무기 공격력") {
+      return effects.some(
+        (e) => e.OptionName === "무기 공격력" && e.IsPercentage === true
+      );
+    }
+    if (opt === "무기 공격력+") {
+      return effects.some(
+        (e) => e.OptionName === "무기 공격력" && e.IsPercentage === false
+      );
+    }
+    // 그 외 옵션은 기존대로 부분 일치
+    return effects.some((e) => e.OptionName.includes(opt));
+  }).length;
+
   if (count >= 3) {
-    return "star";
+    return {
+      pointStyle: "circle",
+      borderColor: "#222222",
+    };
   }
-
   if (count === 2) {
-    return "circle";
+    return {
+      pointStyle: "circle",
+      borderColor: "#9e9e9e",
+    };
   }
-
-  return "rect";
+  return {
+    pointStyle: "rect"
+  };
 }
 
 // pointStyle, label 콜백 분리
@@ -520,18 +549,36 @@ function getTooltipLabel(result, input, context) {
   const grindIdx = context.datasetIndex + input[2].length;
   const item = result[grindIdx][idx];
   if (!item) return '';
-  return `힘민지: ${item.stat}-${Math.round(context.raw.x * 100000) / 1000}%, 골드: ${context.raw.y},\n${item.effects.slice(5).map((item) => [item["OptionName"] + ": " + item["Value"] + "%".repeat(item["Value"] % 1 != 0)]).join(', ')}`;
+  return `힘민지: ${item.stat}-${Math.round(context.raw.x * 100000) / 1000}% | 거래횟수: ${item.tradeLeft}회 | 골드: ${context.raw.y} | \n${item.effects.slice(5).map((item) => [item["OptionName"] + ": " + item["Value"] + "%".repeat(item["Value"] % 1 != 0)]).join(' | ')}`;
 }
 
 function makeDataset(result, input) {
+  const grindColors = ["#aacff3", "#f6b7c1", "#f8d2a5"];
   const datasets = [];
   for (let grindNum = input[2].length; grindNum <= 3; grindNum++) {
     const dataArr = result[grindNum] || [];
+    // pointStyle, borderColor 배열을 한 번에 계산
+    const pointStyles = [];
+    const pointBorderColors = [];
+    for (const item of dataArr) {
+      const style = getPointStyleByOption(item.effects);
+      pointStyles.push(style.pointStyle);
+
+      if (!style.borderColor) {
+        pointBorderColors.push(grindColors[grindNum - 1]); 
+      } else {
+        pointBorderColors.push(style.borderColor);
+      }
+    }
     datasets.push({
       label: `${grindNum}연마`,
       data: dataArr.map((item) => ({ x: item.statPer, y: item.buyPrice })),
+      borderColor: grindColors[grindNum - 1],
+      backgroundColor: grindColors[grindNum - 1],
       pointRadius: 4,
-      pointStyle: dataArr.map((item) => getPointStyleByOption(item.effects)),
+      pointStyle: pointStyles,
+      pointBorderColor: pointBorderColors,
+      pointBorderWidth: 0.5,
     });
   }
   return datasets;
